@@ -36,6 +36,10 @@ label.chk{display:flex;gap:6px;align-items:center}
  .ph{width:63mm;height:88mm;border:.3mm dashed #888;padding:5mm;display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;font-family:Verdana,sans-serif;color:#000}
  .ph .n{font-size:13pt;font-weight:700}.ph .no{font-size:20pt;font-weight:700}.ph .s{font-size:8pt}
  .ph img{height:8mm}
+ .ph img.pic{height:auto;width:100%;flex:1;min-height:0;object-fit:contain;margin:2mm 0}
+ #sheet.list{display:block}
+ #sheet.list table{width:100%;border-collapse:collapse;font:10pt Verdana,sans-serif}
+ #sheet.list td,#sheet.list th{border-bottom:.2mm solid #999;padding:1.5mm;text-align:left}
 }
 </style>
 </head>
@@ -57,7 +61,14 @@ label.chk{display:flex;gap:6px;align-items:center}
    <button class="go" id="load">Build card list</button>
    <label class="chk"><input type="checkbox" id="hideOwn"> Hide cards I own</label>
    <label class="chk"><input type="checkbox" id="logo" checked> Show set symbol</label>
-   <button id="print">Print / Save as PDF</button>
+   <label class="chk">Output:
+    <select id="out">
+     <option value="holder">Placeholders (text only)</option>
+     <option value="image">Placeholders with card picture</option>
+     <option value="list">Checklist only</option>
+    </select></label>
+   <button id="print">Download PDF (print)</button>
+   <button id="csv">Download checklist (CSV)</button>
    <button id="clear">Clear owned ticks</button>
   </div>
   <div id="status">Choose a mode and press “Build card list”.</div>
@@ -67,7 +78,7 @@ label.chk{display:flex;gap:6px;align-items:center}
 <section id="sheet"></section>
 <script>
 const API='https://api.pokemontcg.io/v2';
-const FIELDS='id,name,number,rarity,artist,set,nationalPokedexNumbers';
+const FIELDS='id,name,number,rarity,artist,set,images,nationalPokedexNumbers';
 let mode='set',cards=[],owned=new Set(),setsLoaded=false,sets=[];
 const $=id=>document.getElementById(id);
 try{owned=new Set(JSON.parse(localStorage.getItem('owned')||'[]'))}catch(e){}
@@ -141,9 +152,27 @@ $('grid').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();togg
 $('hideOwn').onchange=render;$('logo').onchange=buildSheet;
 $('clear').onclick=()=>{owned.clear();save();render()};
 function buildSheet(){
- const logo=$('logo').checked;
- $('sheet').innerHTML=visible().map(c=>`<div class="ph"><div><div class="n">${c.name}</div><div class="s">${c.set.name}</div></div><div class="no">${c.number}/${c.set.printedTotal}</div><div class="s">${c.rarity||''}<br>${c.artist||''}</div>${logo?`<img src="${c.set.images.symbol}" alt="">`:''}</div>`).join('');
+ const logo=$('logo').checked,o=$('out').value,v=visible(),sh=$('sheet');
+ sh.className=o==='list'?'list':'';
+ if(o==='list'){
+  sh.innerHTML='<table><tr><th>Have</th><th>Set</th><th>No.</th><th>Name</th><th>Rarity</th><th>Artist</th></tr>'+
+   v.map(c=>`<tr><td>${owned.has(c.id)?'&#9745;':'&#9744;'}</td><td>${c.set.name}</td><td>${c.number}/${c.set.printedTotal}</td><td>${c.name}</td><td>${c.rarity||''}</td><td>${c.artist||''}</td></tr>`).join('')+'</table>';
+  return;
+ }
+ sh.innerHTML=v.map(c=>o==='image'
+  ?`<div class="ph"><div class="s">${c.set.name} ${c.number}/${c.set.printedTotal}</div><img class="pic" src="${c.images&&c.images.small||''}" alt="${c.name}"><div class="n">${c.name}</div></div>`
+  :`<div class="ph"><div><div class="n">${c.name}</div><div class="s">${c.set.name}</div></div><div class="no">${c.number}/${c.set.printedTotal}</div><div class="s">${c.rarity||''}<br>${c.artist||''}</div>${logo?`<img src="${c.set.images.symbol}" alt="">`:''}</div>`).join('');
 }
+$('out').onchange=buildSheet;
+$('csv').onclick=()=>{
+ const v=visible();if(!v.length){$('status').textContent='Build a card list first.';return}
+ const q=x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"';
+ const rows=[['Have','Set','Number','Name','Rarity','Artist','ID'].map(q).join(',')].concat(
+  v.map(c=>[owned.has(c.id)?'Yes':'No',c.set.name,c.number+'/'+c.set.printedTotal,c.name,c.rarity,c.artist,c.id].map(q).join(',')));
+ const a=document.createElement('a');
+ a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'}));
+ a.download='master-set-checklist.csv';a.click();
+};
 $('print').onclick=()=>{
  if(!visible().length){$('status').textContent='Build a card list first.';return}
  buildSheet();window.print();
