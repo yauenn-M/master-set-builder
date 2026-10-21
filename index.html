@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Master Set Placeholder Builder</title>
+<style>
+:root{--bg:#eef1f4;--ink:#1d2733;--mut:#5d6b7a;--panel:#fff;--line:#cdd5dd;--acc:#2456d6;--sleeve:#f9fafb}
+@media (prefers-color-scheme:dark){:root{--bg:#141a21;--ink:#e6ebf0;--mut:#93a1b0;--panel:#1d252e;--line:#33404d;--acc:#6b9bff;--sleeve:#232d38}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 Georgia,'Times New Roman',serif;background:var(--bg);color:var(--ink)}
+h1{font:700 24px/1.2 'Trebuchet MS',Verdana,sans-serif;margin:0}
+header,main{max-width:1100px;margin:0 auto;padding:16px}
+header p{color:var(--mut);margin:4px 0 0}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
+.tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
+button,select,input{font:inherit;color:var(--ink);background:var(--panel);border:1px solid var(--line);border-radius:6px;padding:8px 10px}
+button{cursor:pointer}
+button.on,button.go{background:var(--acc);color:#fff;border-color:var(--acc)}
+:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.row input[type=text],.row select{flex:1;min-width:200px}
+label.chk{display:flex;gap:6px;align-items:center}
+#status{color:var(--mut);margin:6px 0}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.slot{background:var(--sleeve);border:1.5px dashed var(--line);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;min-height:96px;display:flex;flex-direction:column;justify-content:space-between}
+.slot.own{opacity:.45;text-decoration:line-through}
+.slot b{font:700 14px 'Trebuchet MS',Verdana,sans-serif}
+.slot small{color:var(--mut)}
+#sheet{display:none}
+@media print{
+ @page{size:A4;margin:10mm}
+ body{background:#fff;color:#000}
+ header,main{display:none}
+ #sheet{display:grid;grid-template-columns:repeat(3,63mm);gap:0;justify-content:center}
+ .ph{width:63mm;height:88mm;border:.3mm dashed #888;padding:5mm;display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;font-family:Verdana,sans-serif;color:#000}
+ .ph .n{font-size:13pt;font-weight:700}.ph .no{font-size:20pt;font-weight:700}.ph .s{font-size:8pt}
+ .ph img{height:8mm}
+}
+</style>
+</head>
+<body>
+<header>
+ <h1>Master Set Placeholder Builder</h1>
+ <p>Pick what you want to master, tick off what you own, then print placeholders sized for 63 × 88 mm binder pockets.</p>
+</header>
+<main>
+ <section class="panel">
+  <div class="tabs" id="tabs">
+   <button data-m="set" class="on">By set</button>
+   <button data-m="pokemon">By Pokémon</button>
+   <button data-m="artist">By artist</button>
+   <button data-m="custom">My own list</button>
+  </div>
+  <div class="row" id="inputs"></div>
+  <div class="row" style="margin-top:10px">
+   <button class="go" id="load">Build card list</button>
+   <label class="chk"><input type="checkbox" id="hideOwn"> Hide cards I own</label>
+   <label class="chk"><input type="checkbox" id="logo" checked> Show set symbol</label>
+   <button id="print">Print / Save as PDF</button>
+   <button id="clear">Clear owned ticks</button>
+  </div>
+  <div id="status">Choose a mode and press “Build card list”.</div>
+ </section>
+ <section class="grid" id="grid"></section>
+</main>
+<section id="sheet"></section>
+<script>
+const API='https://api.pokemontcg.io/v2';
+const FIELDS='id,name,number,rarity,artist,set,nationalPokedexNumbers';
+let mode='set',cards=[],owned=new Set(),setsLoaded=false,sets=[];
+const $=id=>document.getElementById(id);
+try{owned=new Set(JSON.parse(localStorage.getItem('owned')||'[]'))}catch(e){}
+const save=()=>{try{localStorage.setItem('owned',JSON.stringify([...owned]))}catch(e){}};
+
+function renderInputs(){
+ const box=$('inputs');
+ if(mode==='set'){
+  box.innerHTML='<select id="v"><option>Loading sets…</option></select>';
+  if(setsLoaded)fillSets();else loadSets();
+ }else if(mode==='pokemon') box.innerHTML='<input type="text" id="v" placeholder="Pokémon name, e.g. Pikachu">';
+ else if(mode==='artist') box.innerHTML='<input type="text" id="v" placeholder="Artist, e.g. Mitsuhiro Arita">';
+ else box.innerHTML='<input type="text" id="v" placeholder="Card IDs separated by commas, e.g. sv3-125, base1-4">';
+}
+async function loadSets(){
+ try{
+  const r=await fetch(API+'/sets?orderBy=-releaseDate&select=id,name,total,releaseDate');
+  sets=(await r.json()).data;setsLoaded=true;fillSets();
+ }catch(e){$('status').textContent='Could not load sets. Check your internet connection and try again.'}
+}
+function fillSets(){
+ const s=$('v');if(!s||s.tagName!=='SELECT')return;
+ s.innerHTML=sets.map(x=>`<option value="${x.id}">${x.name} (${x.id}, ${x.total} cards)</option>`).join('');
+}
+$('tabs').onclick=e=>{
+ const m=e.target.dataset.m;if(!m)return;
+ mode=m;[...$('tabs').children].forEach(b=>b.classList.toggle('on',b===e.target));renderInputs();
+};
+
+async function fetchAll(q){
+ let page=1,out=[];
+ while(true){
+  const url=`${API}/cards?q=${encodeURIComponent(q)}&page=${page}&pageSize=250&select=${FIELDS}&orderBy=set.releaseDate,number`;
+  const r=await fetch(url);
+  if(!r.ok)throw new Error('API error '+r.status);
+  const j=await r.json();out=out.concat(j.data);
+  $('status').textContent=`Loading… ${out.length} of ${j.totalCount}`;
+  if(out.length>=j.totalCount||!j.data.length)break;
+  page++;
+ }
+ return out;
+}
+$('load').onclick=async()=>{
+ const v=($('v').value||'').trim();
+ if(!v){$('status').textContent='Please enter or choose something first.';return}
+ let q;
+ if(mode==='set')q=`set.id:${v}`;
+ else if(mode==='pokemon')q=`name:"${v.replace(/"/g,'')}"`;
+ else if(mode==='artist')q=`artist:"${v.replace(/"/g,'')}"`;
+ else q=v.split(/[,\s]+/).filter(Boolean).map(i=>`id:${i}`).join(' OR ');
+ $('status').textContent='Loading…';
+ try{
+  cards=await fetchAll(q);
+  $('status').textContent=cards.length?'':'No cards found. Check the spelling (the artist name must match exactly).';
+  render();
+ }catch(e){$('status').textContent='Something went wrong: '+e.message+'. Wait a moment and try again.'}
+};
+function visible(){return $('hideOwn').checked?cards.filter(c=>!owned.has(c.id)):cards}
+function render(){
+ const v=visible(),own=cards.filter(c=>owned.has(c.id)).length;
+ $('grid').innerHTML=v.map(c=>`<div class="slot ${owned.has(c.id)?'own':''}" data-id="${c.id}" tabindex="0"><b>${c.name}</b><span>${c.set.name}<br><small>#${c.number}/${c.set.printedTotal} · ${c.rarity||'No rarity'}</small></span><small>${c.artist||''}</small></div>`).join('');
+ if(cards.length)$('status').textContent=`${cards.length} cards in list · ${own} owned · ${cards.length-own} to find. Click a card to mark it owned.`;
+ buildSheet();
+}
+function toggle(el){
+ const s=el.closest('.slot');if(!s)return;
+ const id=s.dataset.id;owned.has(id)?owned.delete(id):owned.add(id);save();render();
+}
+$('grid').onclick=e=>toggle(e.target);
+$('grid').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle(e.target)}};
+$('hideOwn').onchange=render;$('logo').onchange=buildSheet;
+$('clear').onclick=()=>{owned.clear();save();render()};
+function buildSheet(){
+ const logo=$('logo').checked;
+ $('sheet').innerHTML=visible().map(c=>`<div class="ph"><div><div class="n">${c.name}</div><div class="s">${c.set.name}</div></div><div class="no">${c.number}/${c.set.printedTotal}</div><div class="s">${c.rarity||''}<br>${c.artist||''}</div>${logo?`<img src="${c.set.images.symbol}" alt="">`:''}</div>`).join('');
+}
+$('print').onclick=()=>{
+ if(!visible().length){$('status').textContent='Build a card list first.';return}
+ buildSheet();window.print();
+};
+renderInputs();
+</script>
+</body>
+</html>
