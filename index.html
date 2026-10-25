@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Master Set Placeholder Builder</title>
-<!-- Your customization lives in config.js. Edit that file, not this one. -->
+<!-- Customization: site-config.js = how the WEBSITE looks. pdf-config.js = how the PDF / PRINT output looks. Edit those, not this file. -->
 <style>
 *{box-sizing:border-box}
 body{margin:0;font:15px/1.5 var(--body);background:var(--bg);color:var(--ink)}
@@ -31,7 +31,8 @@ label.chk{display:flex;gap:6px;align-items:center}
 #sheet{display:none}
 </style>
 <style id="ps"></style>
-<script src="config.js"></script>
+<script src="site-config.js"></script>
+<script src="pdf-config.js"></script>
 </head>
 <body>
 <header>
@@ -79,7 +80,7 @@ const D={
 };
 const isObj=x=>x&&typeof x==='object'&&!Array.isArray(x);
 function merge(a,b){const o=Object.assign({},a);for(const k in b){o[k]=isObj(a[k])&&isObj(b[k])?merge(a[k],b[k]):b[k]}return o}
-const C=merge(D,window.SITE_CONFIG||{});
+const C=merge(D,Object.assign({},window.SITE_CONFIG||{},{pdf:window.PDF_CONFIG||{}}));
 
 /* ---------- 2. APPLY SITE LOOK (text, logo, colors, fonts) ---------- */
 function applyTheme(){
@@ -164,7 +165,7 @@ $('load').onclick=async()=>{
  if(mode==='set')q=`set.id:${v}`;
  else if(mode==='pokemon')q=`name:"${clean}"`;
  else if(mode==='artist')q=`artist:"${clean}"`;
- else if(mode==='preset'){const c=C.collections.find(x=>x.name===v);if(!c||!c.ids.length){$('status').textContent='That preset list has no card IDs yet. Add them in config.js.';return}q=idQuery(c.ids)}
+ else if(mode==='preset'){const c=C.collections.find(x=>x.name===v);if(!c||!c.ids.length){$('status').textContent='That preset list has no card IDs yet. Add them in site-config.js.';return}q=idQuery(c.ids)}
  else q=idQuery(v.split(/[,\s]+/).filter(Boolean));
  $('status').textContent='Loading…';
  try{cards=await fetchAll(q);$('status').textContent=cards.length?'':'No cards found. Check the spelling (artist names must match exactly).';render()}
