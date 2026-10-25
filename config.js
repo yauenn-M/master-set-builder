@@ -70,11 +70,13 @@ window.SITE_CONFIG = {
     layout: {
       top: ["name", "set"],
       center: ["number"],
-      bottom: ["rarity", "artist", "symbol"]
+      //bottom: ["rarity", "artist", "symbol"]
+       bottom: ["symbol"]
     },
 
     /* Text size in points for each item (bigger number = bigger text) */
-    sizes: { name: 13, set: 8, number: 20, rarity: 8, artist: 8, id: 7, shop: 7 },
+    //sizes: { name: 13, set: 8, number: 20, rarity: 8, artist: 8, id: 7, shop: 7 },
+     sizes: { name: 13, set: 8, number: 20, id: 7},
 
     /* CHECKLIST SETTINGS */
     listTitle: "Master Set Checklist",   // shown under your shop name on the checklist
