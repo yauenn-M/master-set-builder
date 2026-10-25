@@ -76,7 +76,7 @@ window.SITE_CONFIG = {
 
     /* Text size in points for each item (bigger number = bigger text) */
     //sizes: { name: 13, set: 8, number: 20, rarity: 8, artist: 8, id: 7, shop: 7 },
-     sizes: { name: 13, set: 8, number: 20, id: 7},
+     sizes: { name: 13, set: 8, number: 10, id: 7},
 
     /* CHECKLIST SETTINGS */
     listTitle: "Master Set Checklist",   // shown under your shop name on the checklist
