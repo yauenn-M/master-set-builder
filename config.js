@@ -71,7 +71,7 @@ window.SITE_CONFIG = {
       top: ["name", "set"],
       center: ["number"],
       //bottom: ["rarity", "artist", "symbol"]
-       bottom: ["symbol"]
+      //bottom: ["symbol"]
     },
 
     /* Text size in points for each item (bigger number = bigger text) */
