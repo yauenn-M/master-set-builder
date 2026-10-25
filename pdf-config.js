@@ -42,11 +42,11 @@ window.PDF_CONFIG = {
   layout: {
     top: ["name", "set"],
     center: ["number"],
-    bottom: ["rarity", "artist", "symbol"]
+    //bottom: ["rarity", "artist", "symbol"]
   },
 
   /* ---------- 5. TEXT SIZES (points; bigger number = bigger text) ---------- */
-  sizes: { name: 13, set: 8, number: 20, rarity: 8, artist: 8, id: 7, shop: 7 },
+  sizes: { name: 13, set: 8, number: 12, rarity: 8, artist: 8, id: 7, shop: 7 },
 
   /* ---------- 6. CHECKLIST ---------- */
   listTitle: "Master Set Checklist",   // shown under your shop name
