@@ -4,13 +4,14 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Master Set Placeholder Builder</title>
+<!-- Your customization lives in config.js. Edit that file, not this one. -->
 <style>
-:root{--bg:#eef1f4;--ink:#1d2733;--mut:#5d6b7a;--panel:#fff;--line:#cdd5dd;--acc:#2456d6;--sleeve:#f9fafb}
-@media (prefers-color-scheme:dark){:root{--bg:#141a21;--ink:#e6ebf0;--mut:#93a1b0;--panel:#1d252e;--line:#33404d;--acc:#6b9bff;--sleeve:#232d38}}
 *{box-sizing:border-box}
-body{margin:0;font:15px/1.5 Georgia,'Times New Roman',serif;background:var(--bg);color:var(--ink)}
-h1{font:700 24px/1.2 'Trebuchet MS',Verdana,sans-serif;margin:0}
+body{margin:0;font:15px/1.5 var(--body);background:var(--bg);color:var(--ink)}
+h1{font:700 24px/1.2 var(--head);margin:0}
 header,main{max-width:1100px;margin:0 auto;padding:16px}
+header{display:flex;gap:12px;align-items:center}
+#logo{height:52px;display:none}
 header p{color:var(--mut);margin:4px 0 0}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px;margin-bottom:14px}
 .tabs{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:12px}
@@ -19,48 +20,31 @@ button{cursor:pointer}
 button.on,button.go{background:var(--acc);color:#fff;border-color:var(--acc)}
 :focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
-.row input[type=text],.row select{flex:1;min-width:200px}
+.row input[type=text],.row select#v{flex:1;min-width:200px}
 label.chk{display:flex;gap:6px;align-items:center}
 #status{color:var(--mut);margin:6px 0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.slot{background:var(--sleeve);border:1.5px dashed var(--line);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;min-height:96px;display:flex;flex-direction:column;justify-content:space-between}
+.slot{background:var(--panel);border:1.5px dashed var(--line);border-radius:8px;padding:10px;font-size:13px;cursor:pointer;min-height:96px;display:flex;flex-direction:column;justify-content:space-between}
 .slot.own{opacity:.45;text-decoration:line-through}
-.slot b{font:700 14px 'Trebuchet MS',Verdana,sans-serif}
+.slot b{font:700 14px var(--head)}
 .slot small{color:var(--mut)}
 #sheet{display:none}
-@media print{
- @page{size:A4;margin:10mm}
- body{background:#fff;color:#000}
- header,main{display:none}
- #sheet{display:grid;grid-template-columns:repeat(3,63mm);gap:0;justify-content:center}
- .ph{width:63mm;height:88mm;border:.3mm dashed #888;padding:5mm;display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;font-family:Verdana,sans-serif;color:#000}
- .ph .n{font-size:13pt;font-weight:700}.ph .no{font-size:20pt;font-weight:700}.ph .s{font-size:8pt}
- .ph img{height:8mm}
- .ph img.pic{height:auto;width:100%;flex:1;min-height:0;object-fit:contain;margin:2mm 0}
- #sheet.list{display:block}
- #sheet.list table{width:100%;border-collapse:collapse;font:10pt Verdana,sans-serif}
- #sheet.list td,#sheet.list th{border-bottom:.2mm solid #999;padding:1.5mm;text-align:left}
-}
 </style>
+<style id="ps"></style>
+<script src="config.js"></script>
 </head>
 <body>
 <header>
- <h1>Master Set Placeholder Builder</h1>
- <p>Pick what you want to master, tick off what you own, then print placeholders sized for 63 × 88 mm binder pockets.</p>
+ <img id="logo" alt="">
+ <div><h1 id="ttl"></h1><p id="sub"></p></div>
 </header>
 <main>
  <section class="panel">
-  <div class="tabs" id="tabs">
-   <button data-m="set" class="on">By set</button>
-   <button data-m="pokemon">By Pokémon</button>
-   <button data-m="artist">By artist</button>
-   <button data-m="custom">My own list</button>
-  </div>
+  <div class="tabs" id="tabs"></div>
   <div class="row" id="inputs"></div>
   <div class="row" style="margin-top:10px">
    <button class="go" id="load">Build card list</button>
    <label class="chk"><input type="checkbox" id="hideOwn"> Hide cards I own</label>
-   <label class="chk"><input type="checkbox" id="logo" checked> Show set symbol</label>
    <label class="chk">Output:
     <select id="out">
      <option value="holder">Placeholders (text only)</option>
@@ -77,107 +61,166 @@ label.chk{display:flex;gap:6px;align-items:center}
 </main>
 <section id="sheet"></section>
 <script>
+const $=id=>document.getElementById(id);
+
+/* ---------- 1. DEFAULTS (used if config.js is missing or has gaps) ---------- */
+const D={
+ shopName:'My Card Shop',title:'Master Set Placeholder Builder',subtitle:'Pick a master set, tick what you own, then download your placeholders.',logoUrl:'',
+ colors:{accent:'#2456d6',background:'#eef1f4',panel:'#ffffff',text:'#1d2733',muted:'#5d6b7a',line:'#cdd5dd'},darkColors:null,
+ fonts:{heading:"'Trebuchet MS',Verdana,sans-serif",body:"Georgia,serif",googleFontsUrl:''},
+ modes:['set','pokemon','artist','custom','preset'],
+ tabNames:{set:'By set',pokemon:'By Pokémon',artist:'By artist',custom:'My own list',preset:'Preset lists'},
+ defaultOutput:'holder',collections:[],
+ pdf:{paper:'A4',marginMm:10,widthMm:63,heightMm:88,paddingMm:5,showCutLine:true,cutLineStyle:'dashed',cutLineColor:'#888888',
+  backgroundColor:'#ffffff',textColor:'#000000',fontFamily:'Verdana,sans-serif',
+  layout:{top:['name','set'],center:['number'],bottom:['rarity','artist','symbol']},
+  sizes:{name:13,set:8,number:20,rarity:8,artist:8,id:7,shop:7},
+  listTitle:'Master Set Checklist',checklistColumns:['have','set','number','name','rarity','artist']}
+};
+const isObj=x=>x&&typeof x==='object'&&!Array.isArray(x);
+function merge(a,b){const o=Object.assign({},a);for(const k in b){o[k]=isObj(a[k])&&isObj(b[k])?merge(a[k],b[k]):b[k]}return o}
+const C=merge(D,window.SITE_CONFIG||{});
+
+/* ---------- 2. APPLY SITE LOOK (text, logo, colors, fonts) ---------- */
+function applyTheme(){
+ let k=C.colors;
+ if(C.darkColors&&matchMedia('(prefers-color-scheme:dark)').matches)k=Object.assign({},k,C.darkColors);
+ const r=document.documentElement.style;
+ r.setProperty('--acc',k.accent);r.setProperty('--bg',k.background);r.setProperty('--panel',k.panel);
+ r.setProperty('--ink',k.text);r.setProperty('--mut',k.muted);r.setProperty('--line',k.line);
+ r.setProperty('--head',C.fonts.heading);r.setProperty('--body',C.fonts.body);
+ if(C.fonts.googleFontsUrl){const l=document.createElement('link');l.rel='stylesheet';l.href=C.fonts.googleFontsUrl;document.head.appendChild(l)}
+ document.title=C.title;$('ttl').textContent=C.title;$('sub').textContent=C.subtitle;
+ if(C.logoUrl){$('logo').src=C.logoUrl;$('logo').style.display='block'}
+ $('out').value=C.defaultOutput;
+}
+
+/* ---------- 3. PRINT LAYOUT (built from the pdf section of config.js) ---------- */
+function printCSS(){
+ const p=C.pdf,lt=p.paper.toLowerCase()==='letter',W=lt?215.9:210;
+ const cols=Math.max(1,Math.floor((W-2*p.marginMm)/p.widthMm));
+ const b=p.showCutLine?`.3mm ${p.cutLineStyle} ${p.cutLineColor}`:'0';
+ const z=Object.keys(p.sizes).map(k=>`.ph .f-${k}{font-size:${p.sizes[k]}pt}`).join('');
+ return `@media print{@page{size:${lt?'letter':'A4'};margin:${p.marginMm}mm}
+ body{background:#fff;color:#000}header,main{display:none}
+ #sheet{display:grid;grid-template-columns:repeat(${cols},${p.widthMm}mm);justify-content:center}
+ #sheet.list{display:block}
+ .ph{width:${p.widthMm}mm;height:${p.heightMm}mm;border:${b};background:${p.backgroundColor};color:${p.textColor};padding:${p.paddingMm}mm;display:flex;flex-direction:column;justify-content:space-between;break-inside:avoid;overflow:hidden;font:8pt ${p.fontFamily}}
+ .ph .sec{display:flex;flex-direction:column;gap:1mm}
+ .ph .f-name,.ph .f-number{font-weight:700}
+ .ph img{max-height:9mm;max-width:100%;align-self:flex-start}
+ .ph img.pic{max-height:none;height:auto;width:100%;flex:1;min-height:0;object-fit:contain;margin:2mm 0}
+ ${z}
+ #sheet h2{font:700 16pt ${p.fontFamily};margin:0 0 4mm}
+ #sheet.list table{width:100%;border-collapse:collapse;font:10pt ${p.fontFamily}}
+ #sheet.list td,#sheet.list th{border-bottom:.2mm solid #999;padding:1.5mm;text-align:left}}`;
+}
+
+/* ---------- 4. STATE ---------- */
 const API='https://api.pokemontcg.io/v2';
 const FIELDS='id,name,number,rarity,artist,set,images,nationalPokedexNumbers';
-let mode='set',cards=[],owned=new Set(),setsLoaded=false,sets=[];
-const $=id=>document.getElementById(id);
+let mode=C.modes[0],cards=[],owned=new Set(),sets=[],setsLoaded=false;
 try{owned=new Set(JSON.parse(localStorage.getItem('owned')||'[]'))}catch(e){}
 const save=()=>{try{localStorage.setItem('owned',JSON.stringify([...owned]))}catch(e){}};
 
+/* ---------- 5. MODE BUTTONS AND INPUTS ---------- */
+function renderTabs(){
+ const m=C.modes.filter(x=>x!=='preset'||C.collections.length);
+ if(!m.includes(mode))mode=m[0];
+ $('tabs').innerHTML=m.map(x=>`<button data-m="${x}" class="${x===mode?'on':''}">${C.tabNames[x]||x}</button>`).join('');
+}
 function renderInputs(){
  const box=$('inputs');
- if(mode==='set'){
-  box.innerHTML='<select id="v"><option>Loading sets…</option></select>';
-  if(setsLoaded)fillSets();else loadSets();
- }else if(mode==='pokemon') box.innerHTML='<input type="text" id="v" placeholder="Pokémon name, e.g. Pikachu">';
- else if(mode==='artist') box.innerHTML='<input type="text" id="v" placeholder="Artist, e.g. Mitsuhiro Arita">';
- else box.innerHTML='<input type="text" id="v" placeholder="Card IDs separated by commas, e.g. sv3-125, base1-4">';
+ if(mode==='set'){box.innerHTML='<select id="v"><option>Loading sets…</option></select>';setsLoaded?fillSets():loadSets()}
+ else if(mode==='preset')box.innerHTML='<select id="v">'+C.collections.map(x=>`<option>${x.name}</option>`).join('')+'</select>';
+ else if(mode==='pokemon')box.innerHTML='<input type="text" id="v" placeholder="Pokémon name, e.g. Pikachu">';
+ else if(mode==='artist')box.innerHTML='<input type="text" id="v" placeholder="Artist, e.g. Mitsuhiro Arita">';
+ else box.innerHTML='<input type="text" id="v" placeholder="Card IDs separated by commas, e.g. base1-4, base1-2">';
 }
 async function loadSets(){
- try{
-  const r=await fetch(API+'/sets?orderBy=-releaseDate&select=id,name,total,releaseDate');
-  sets=(await r.json()).data;setsLoaded=true;fillSets();
- }catch(e){$('status').textContent='Could not load sets. Check your internet connection and try again.'}
+ try{const r=await fetch(API+'/sets?orderBy=-releaseDate&select=id,name,total,releaseDate');sets=(await r.json()).data;setsLoaded=true;fillSets()}
+ catch(e){$('status').textContent='Could not load sets. Check your internet connection and try again.'}
 }
-function fillSets(){
- const s=$('v');if(!s||s.tagName!=='SELECT')return;
- s.innerHTML=sets.map(x=>`<option value="${x.id}">${x.name} (${x.id}, ${x.total} cards)</option>`).join('');
-}
-$('tabs').onclick=e=>{
- const m=e.target.dataset.m;if(!m)return;
- mode=m;[...$('tabs').children].forEach(b=>b.classList.toggle('on',b===e.target));renderInputs();
-};
+function fillSets(){const s=$('v');if(s&&s.tagName==='SELECT'&&mode==='set')s.innerHTML=sets.map(x=>`<option value="${x.id}">${x.name} (${x.id}, ${x.total} cards)</option>`).join('')}
+$('tabs').onclick=e=>{const m=e.target.dataset.m;if(!m)return;mode=m;renderTabs();renderInputs()};
 
+/* ---------- 6. LOAD CARDS ---------- */
 async function fetchAll(q){
  let page=1,out=[];
  while(true){
-  const url=`${API}/cards?q=${encodeURIComponent(q)}&page=${page}&pageSize=250&select=${FIELDS}&orderBy=set.releaseDate,number`;
-  const r=await fetch(url);
+  const r=await fetch(`${API}/cards?q=${encodeURIComponent(q)}&page=${page}&pageSize=250&select=${FIELDS}&orderBy=set.releaseDate,number`);
   if(!r.ok)throw new Error('API error '+r.status);
   const j=await r.json();out=out.concat(j.data);
   $('status').textContent=`Loading… ${out.length} of ${j.totalCount}`;
-  if(out.length>=j.totalCount||!j.data.length)break;
-  page++;
+  if(out.length>=j.totalCount||!j.data.length)break;page++;
  }
  return out;
 }
+const idQuery=ids=>ids.map(i=>`id:${i}`).join(' OR ');
 $('load').onclick=async()=>{
  const v=($('v').value||'').trim();
  if(!v){$('status').textContent='Please enter or choose something first.';return}
- let q;
+ const clean=v.replace(/"/g,'');let q;
  if(mode==='set')q=`set.id:${v}`;
- else if(mode==='pokemon')q=`name:"${v.replace(/"/g,'')}"`;
- else if(mode==='artist')q=`artist:"${v.replace(/"/g,'')}"`;
- else q=v.split(/[,\s]+/).filter(Boolean).map(i=>`id:${i}`).join(' OR ');
+ else if(mode==='pokemon')q=`name:"${clean}"`;
+ else if(mode==='artist')q=`artist:"${clean}"`;
+ else if(mode==='preset'){const c=C.collections.find(x=>x.name===v);if(!c||!c.ids.length){$('status').textContent='That preset list has no card IDs yet. Add them in config.js.';return}q=idQuery(c.ids)}
+ else q=idQuery(v.split(/[,\s]+/).filter(Boolean));
  $('status').textContent='Loading…';
- try{
-  cards=await fetchAll(q);
-  $('status').textContent=cards.length?'':'No cards found. Check the spelling (the artist name must match exactly).';
-  render();
- }catch(e){$('status').textContent='Something went wrong: '+e.message+'. Wait a moment and try again.'}
+ try{cards=await fetchAll(q);$('status').textContent=cards.length?'':'No cards found. Check the spelling (artist names must match exactly).';render()}
+ catch(e){$('status').textContent='Something went wrong: '+e.message+'. Wait a moment and try again.'}
 };
-function visible(){return $('hideOwn').checked?cards.filter(c=>!owned.has(c.id)):cards}
+
+/* ---------- 7. SCREEN LIST ---------- */
+const visible=()=>$('hideOwn').checked?cards.filter(c=>!owned.has(c.id)):cards;
 function render(){
  const v=visible(),own=cards.filter(c=>owned.has(c.id)).length;
  $('grid').innerHTML=v.map(c=>`<div class="slot ${owned.has(c.id)?'own':''}" data-id="${c.id}" tabindex="0"><b>${c.name}</b><span>${c.set.name}<br><small>#${c.number}/${c.set.printedTotal} · ${c.rarity||'No rarity'}</small></span><small>${c.artist||''}</small></div>`).join('');
  if(cards.length)$('status').textContent=`${cards.length} cards in list · ${own} owned · ${cards.length-own} to find. Click a card to mark it owned.`;
  buildSheet();
 }
-function toggle(el){
- const s=el.closest('.slot');if(!s)return;
- const id=s.dataset.id;owned.has(id)?owned.delete(id):owned.add(id);save();render();
-}
+function toggle(el){const s=el.closest('.slot');if(!s)return;const id=s.dataset.id;owned.has(id)?owned.delete(id):owned.add(id);save();render()}
 $('grid').onclick=e=>toggle(e.target);
 $('grid').onkeydown=e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();toggle(e.target)}};
-$('hideOwn').onchange=render;$('logo').onchange=buildSheet;
+$('hideOwn').onchange=render;$('out').onchange=buildSheet;
 $('clear').onclick=()=>{owned.clear();save();render()};
+
+/* ---------- 8. PRINT SHEET TEMPLATES ---------- */
+const F={ // every item you can put in config.js layout
+ name:c=>c.name,set:c=>c.set.name,number:c=>c.number+'/'+c.set.printedTotal,rarity:c=>c.rarity||'',artist:c=>c.artist||'',id:c=>c.id,
+ shop:()=>C.shopName,
+ symbol:c=>`<img src="${c.set.images.symbol}" alt="">`,
+ logo:()=>C.logoUrl?`<img src="${C.logoUrl}" alt="">`:''
+};
+const fld=(k,c)=>F[k]?`<div class="f-${k}">${F[k](c)}</div>`:'';
+const sec=(a,c)=>`<div class="sec">${(a||[]).map(k=>fld(k,c)).join('')}</div>`;
+const COL={ // checklist columns: [heading, value]
+ have:['Have',c=>owned.has(c.id)?'&#9745;':'&#9744;'],set:['Set',c=>c.set.name],number:['No.',c=>c.number+'/'+c.set.printedTotal],
+ name:['Name',c=>c.name],rarity:['Rarity',c=>c.rarity||''],artist:['Artist',c=>c.artist||''],id:['ID',c=>c.id]
+};
 function buildSheet(){
- const logo=$('logo').checked,o=$('out').value,v=visible(),sh=$('sheet');
+ const o=$('out').value,v=visible(),sh=$('sheet'),L=C.pdf.layout,cols=C.pdf.checklistColumns.filter(k=>COL[k]);
  sh.className=o==='list'?'list':'';
  if(o==='list'){
-  sh.innerHTML='<table><tr><th>Have</th><th>Set</th><th>No.</th><th>Name</th><th>Rarity</th><th>Artist</th></tr>'+
-   v.map(c=>`<tr><td>${owned.has(c.id)?'&#9745;':'&#9744;'}</td><td>${c.set.name}</td><td>${c.number}/${c.set.printedTotal}</td><td>${c.name}</td><td>${c.rarity||''}</td><td>${c.artist||''}</td></tr>`).join('')+'</table>';
-  return;
+  sh.innerHTML=`<h2>${C.shopName} – ${C.pdf.listTitle}</h2><table><tr>${cols.map(k=>`<th>${COL[k][0]}</th>`).join('')}</tr>`+
+   v.map(c=>`<tr>${cols.map(k=>`<td>${COL[k][1](c)}</td>`).join('')}</tr>`).join('')+'</table>';return;
  }
  sh.innerHTML=v.map(c=>o==='image'
-  ?`<div class="ph"><div class="s">${c.set.name} ${c.number}/${c.set.printedTotal}</div><img class="pic" src="${c.images&&c.images.small||''}" alt="${c.name}"><div class="n">${c.name}</div></div>`
-  :`<div class="ph"><div><div class="n">${c.name}</div><div class="s">${c.set.name}</div></div><div class="no">${c.number}/${c.set.printedTotal}</div><div class="s">${c.rarity||''}<br>${c.artist||''}</div>${logo?`<img src="${c.set.images.symbol}" alt="">`:''}</div>`).join('');
+  ?`<div class="ph"><div class="sec">${fld('set',c)}${fld('number',c)}</div><img class="pic" src="${c.images&&c.images.small||''}" alt="${c.name}"><div class="sec">${fld('name',c)}${fld('shop',c)}</div></div>`
+  :`<div class="ph">${sec(L.top,c)}${sec(L.center,c)}${sec(L.bottom,c)}</div>`).join('');
 }
-$('out').onchange=buildSheet;
+$('print').onclick=()=>{if(!visible().length){$('status').textContent='Build a card list first.';return}buildSheet();window.print()};
 $('csv').onclick=()=>{
  const v=visible();if(!v.length){$('status').textContent='Build a card list first.';return}
- const q=x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"';
- const rows=[['Have','Set','Number','Name','Rarity','Artist','ID'].map(q).join(',')].concat(
-  v.map(c=>[owned.has(c.id)?'Yes':'No',c.set.name,c.number+'/'+c.set.printedTotal,c.name,c.rarity,c.artist,c.id].map(q).join(',')));
- const a=document.createElement('a');
- a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'}));
+ const cols=C.pdf.checklistColumns.filter(k=>COL[k]),q=x=>'"'+String(x==null?'':x).replace(/"/g,'""')+'"';
+ const val=(k,c)=>k==='have'?(owned.has(c.id)?'Yes':'No'):COL[k][1](c);
+ const rows=[cols.map(k=>q(COL[k][0])).join(',')].concat(v.map(c=>cols.map(k=>q(val(k,c))).join(',')));
+ const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['\ufeff'+rows.join('\n')],{type:'text/csv'}));
  a.download='master-set-checklist.csv';a.click();
 };
-$('print').onclick=()=>{
- if(!visible().length){$('status').textContent='Build a card list first.';return}
- buildSheet();window.print();
-};
-renderInputs();
+
+/* ---------- 9. START ---------- */
+applyTheme();$('ps').textContent=printCSS();renderTabs();renderInputs();
 </script>
 </body>
 </html>
