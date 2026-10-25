@@ -8,7 +8,7 @@
 window.SITE_CONFIG = {
 
   /* ---------- 1. YOUR SHOP AND SITE TEXT ---------- */
-  shopName: "My Card Shop",                    // printed on placeholders/checklists if you add "shop" below
+  shopName: "Confused Lizard PH",                    // printed on placeholders/checklists if you add "shop" below
   title: "Master Set Placeholder Builder",     // big title at the top of the site
   subtitle: "Pick a master set, tick what you own, then download your placeholders.",
   logoUrl: "",                                 // e.g. "logo.png" (upload the image to GitHub next to index.html). Empty = no logo
